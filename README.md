@@ -5,7 +5,7 @@
 An agent-powered chatbot for **Garliclo**, a Lebanese business founded by Joseph Nader that sells air-peeled garlic.
 Toumi answers customer questions from the business profile, routes every message (general question / lead / feedback),
 collects leads, and logs feedback and unanswered questions through tool calls. It runs on the **OpenAI API** (or the
-**Gemini API**, switchable in `.env`) and ships with a branded **Gradio** interface.
+**Gemini API**) and ships with a branded **Gradio** interface.
 
 ## Submission checklist
 
@@ -21,8 +21,8 @@ collects leads, and logs feedback and unanswered questions through tool calls. I
 | Gradio `ChatInterface` | Notebook §7 / [`app.py`](app.py) |
 | API key in `.env` (not uploaded) | `.env` is listed in [`.gitignore`](.gitignore); see [`.env.example`](.env.example) |
 | ⭐ Bonus: reflection with logged draft & revised replies | Notebook §8: console + `logs/reflections.jsonl` + the UI's *Agent trace* panel |
-| ⭐ Bonus: Hugging Face Spaces | One-command deploy: [`tools/deploy_hf_space.py`](tools/deploy_hf_space.py) (see [below](#deploy-to-hugging-face-spaces)) |
-| Evidence it works | Notebook §9: 15-message test set, **15/15 passed** (router 100%, tool calls 100%, median 2.3 s) |
+| ⭐ Bonus: Hugging Face Spaces | [`tools/deploy_hf_space.py`](tools/deploy_hf_space.py) (see [below](#deploy-to-hugging-face-spaces)) |
+| Evaluation | Notebook §9: 15-message test set, **15/15 passed** (router 100%, tool calls 100%, median 2.3 s) |
 
 ## Project structure
 
@@ -62,22 +62,20 @@ Reflection (bonus): checks the draft against the instructions → approve, revis
 reply + Agent trace panel (route, tool calls, draft vs. final)
 ```
 
-* **OpenAI or Gemini, same code.** The assignment allows `google.generativeai` or `openai.ChatCompletion`. We use the
-  `openai` SDK's `client.chat.completions.create(...)`, which is the current name of `openai.ChatCompletion.create(...)`.
-  With `LLM_PROVIDER=gemini`, the same code calls the Gemini API through its OpenAI-compatible endpoint.
-* **Right-sized models.** A tiny model routes (`gpt-4.1-nano`), and a small fast model answers and reflects
-  (`gpt-4.1-mini`). One chat turn costs about **$0.003**, so $5 covers well over 1,000 turns.
+* **Models.** The agent uses the `openai` SDK's Chat Completions API (`client.chat.completions.create`). A small model
+  routes (`gpt-4.1-nano`) and a fast model answers and reflects (`gpt-4.1-mini`). Setting `LLM_PROVIDER=gemini` runs
+  the same code on the Gemini API through its OpenAI-compatible endpoint.
 * **Model fallback.** If a model is rate-limited, overloaded or unavailable, the call falls back to the next model in
   `LLM_FALLBACK_MODELS`.
-* **Guardrails.** At most 5 tool steps per turn. The feedback route must call `record_feedback`, so feedback is never
-  "promised" without being logged. Emails are validated before a lead is saved. The router has a 6-second timeout.
+* **Guardrails.** At most 5 tool steps per turn. The feedback route must call `record_feedback`, so feedback is always
+  logged. Emails are validated before a lead is saved. The router has a 6-second timeout.
 * **Answer quality.** When a customer says "trimmed" or "untrimmed" without saying which product, Toumi gives both
   options and prices (fresh $4.00 vs. frozen $3.00) instead of guessing. Reflection double-checks this, and also logs
   any unanswered question the agent forgot to log.
 * **Speed.** Messages containing an email skip the router call. Only the last 10 exchanges are sent to the model.
   Reflection is skipped when a tool already ran and the reply has no numbers to verify. A typical reply takes 2–3 s.
-* **Budget guard.** Each chat is capped at `MAX_MESSAGES_PER_SESSION` messages and the whole app at
-  `MAX_TURNS_PER_DAY` replies, so a public deployment cannot drain the API budget.
+* **Usage limits.** Each chat is capped at `MAX_MESSAGES_PER_SESSION` messages and the whole app at
+  `MAX_TURNS_PER_DAY` replies.
 
 ## Setup and run
 
@@ -85,11 +83,10 @@ reply + Agent trace panel (route, tool calls, draft vs. final)
 python -m venv .venv
 .venv\Scripts\activate          # Windows  (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
-copy .env.example .env          # then put your OpenAI key in .env
+copy .env.example .env          # then put your API key in .env
 ```
 
-* **Notebook:** open `business_agent.ipynb` and choose *Run All* (about 1 minute and $0.10 of API usage, including
-  the test set). The last cell launches the UI.
+* **Notebook:** open `business_agent.ipynb` and choose *Run All*. The last cell launches the UI.
 * **App:** `python app.py`, then open http://127.0.0.1:7860
 
 ### `.env` settings
@@ -103,45 +100,37 @@ copy .env.example .env          # then put your OpenAI key in .env
 | `LLM_ROUTER_MODEL` | `gpt-4.1-nano` | Router (Gemini default: `gemini-3.1-flash-lite`) |
 | `LLM_REFLECTION_MODEL` | `gpt-4.1-mini` | Reflection pass (Gemini default: `gemini-2.5-flash`) |
 | `LLM_FALLBACK_MODELS` | `gpt-4o-mini,gpt-4.1-nano` | Tried in order when a model is unavailable |
-| `SHOW_ADMIN_PANEL` | `false` | `true` shows the *Team inbox* tab (leads & feedback). **Keep false when public.** |
+| `SHOW_ADMIN_PANEL` | `false` | `true` shows the *Team inbox* tab (leads & feedback). Keep it `false` on a public deployment. |
 | `MAX_MESSAGES_PER_SESSION` | `30` | Messages allowed per chat before Toumi points to WhatsApp |
-| `MAX_TURNS_PER_DAY` | `300` | Replies allowed per day for the whole app (about $1/day at most) |
+| `MAX_TURNS_PER_DAY` | `300` | Replies allowed per day for the whole app |
 | `PUSHOVER_USER`, `PUSHOVER_TOKEN` | unset | Optional phone push notifications for new leads and feedback |
 
-> **Gemini free tier.** A free Gemini key allows only about **20 requests per model per day**, and each chat turn uses
-> 3–4 requests, which is why OpenAI is the default. Models that hit their Gemini daily quota are skipped automatically
-> for the rest of the day.
+## Business information
 
-## Business information: sources and assumptions
+To update it, edit `me/business_summary.txt` and the `CONTENT` section of `tools/make_business_pdf.py`, then run
+`python tools/make_business_pdf.py`.
 
-Garliclo is a real business. To update its information, edit `me/business_summary.txt` and the `CONTENT` section of
-`tools/make_business_pdf.py`, then run `python tools/make_business_pdf.py`.
-
-**Confirmed by the business, or from public sources:** the [@garliclo.lb Instagram](https://www.instagram.com/garliclo.lb/),
-the [Factories in Lebanon listing](https://factoriesinlebanon.com/acadp_listings/garliclo-nader-garlic/),
-Garliclo's logo and price-list card, and answers from the owner's family.
-* "Garliclo | Nader Garlic", founded in 1980 by Joseph Nader (sole founder)
+**Sources:** the [@garliclo.lb Instagram](https://www.instagram.com/garliclo.lb/), the
+[Factories in Lebanon listing](https://factoriesinlebanon.com/acadp_listings/garliclo-nader-garlic/), Garliclo's logo
+and price-list card, and the business owner.
+* "Garliclo | Nader Garlic", founded in 1980 by Joseph Nader
 * Logo tagline: مقشّر عالهوا مش بالميّ ("air-peeled, not water-peeled")
-* Prices are USD per kg. Products 1–2 are air-peeled in the Sin El Fil factory; products 3–4 arrive already peeled from China.
+* Prices in USD per kg. Products 1–2 are air-peeled in the Sin El Fil factory; products 3–4 arrive already peeled from China.
 * Main factory in Sin El Fil (Metn); delivery all over Lebanon, with the fee depending on location
 * Packaging in whatever quantity the customer needs; all forms of payment accepted
-* Business customers only: restaurants, industrial kitchens, butcheries, supermarkets and other food businesses.
-  No small quantities for households.
-* Contact: main business number (WhatsApp & calls) +961 70 546 473, second phone +961 3 793 752,
-  garliclo.lb@gmail.com, @garliclo.lb
-* Slogans: "No chopping. No peeling. No mess.", "We peel for you", consistent recipes plate after plate,
-  "Chefs trust Garliclo", garlic quality all year long, "always ready"
+* Business customers only: restaurants, industrial kitchens, butcheries, supermarkets and other food businesses
+* Contact: +961 70 546 473 (WhatsApp & calls), +961 3 793 752, garliclo.lb@gmail.com, @garliclo.lb
+* Slogans: "No chopping. No peeling. No mess.", "We peel for you", "Chefs trust Garliclo", "always ready"
 
-**Assumed or researched (the owner approved making these up):**
+**Assumptions:**
 * Delivery fee table: Zone 1 Greater Beirut $3, Zone 2 Metn/Keserwan/Aley $5, Zone 3 Jbeil/Batroun/Chouf $7,
   Zone 4 North/Bekaa/Saida $10, Zone 5 far areas $15; free delivery from 50 kg in Zones 1–3
 * Pack sizes: vacuum-sealed 1, 5 and 10 kg bags or custom quantities; frozen in 1 kg bags inside 10 kg cartons
-* Shelf life: fresh up to 3 weeks unopened at 0–4 °C (published studies on packed peeled garlic report 2–4 weeks
-  at 0–5 °C); frozen 12 months at −18 °C
-* Payment methods listed as cash (USD/LBP), bank transfer, card, Whish Money, OMT
-* Customer types beyond the bio: caterers, hotels, food manufacturers
-* Mission and vision wording, air-peeling process steps, the production and customer-care team descriptions
-* Not offered: toum, garlic paste, whole bulbs (customer requests for these are logged as demand signals)
+* Shelf life: fresh up to 3 weeks unopened at 0–4 °C; frozen 12 months at −18 °C
+* Payment methods: cash (USD/LBP), bank transfer, card, Whish Money, OMT
+* Customer types: caterers, hotels, food manufacturers
+* Mission and vision wording, air-peeling process steps, and the production and customer-care team descriptions
+* Not offered: toum, garlic paste, whole bulbs (customer requests for these are logged as feedback)
 
 ## Deploy to Hugging Face Spaces
 
@@ -156,6 +145,4 @@ first build takes a few minutes.
 
 ## Demo video
 
-The assignment asks for "a video showcasing the functionality". The video walks through every item of the submission
-checklist above, in order: business files → persona and instructions → router → tools → system prompt and agent loop →
-Gradio demo → reflection → test results.
+*Link coming soon.*
