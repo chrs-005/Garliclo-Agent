@@ -21,7 +21,8 @@ collects leads, and logs feedback and unanswered questions through tool calls. I
 | Gradio `ChatInterface` | Notebook §7 / [`app.py`](app.py) |
 | API key in `.env` (not uploaded) | `.env` is listed in [`.gitignore`](.gitignore); see [`.env.example`](.env.example) |
 | ⭐ Bonus: reflection with logged draft & revised replies | Notebook §8: console + `logs/reflections.jsonl` + the UI's *Agent trace* panel |
-| ⭐ Bonus: Hugging Face Spaces | See [Deploy to Hugging Face Spaces](#deploy-to-hugging-face-spaces) |
+| ⭐ Bonus: Hugging Face Spaces | One-command deploy: [`tools/deploy_hf_space.py`](tools/deploy_hf_space.py) (see [below](#deploy-to-hugging-face-spaces)) |
+| Evidence it works | Notebook §9: 15-message test set, **15/15 passed** (router 100%, tool calls 100%, median 2.3 s) |
 
 ## Project structure
 
@@ -34,6 +35,7 @@ business_bot/
 ├── app.py                       # Same agent as a standalone app (for deployment)
 ├── assets/logo.png              # Garliclo logo used by the UI and the PDF
 ├── tools/make_business_pdf.py   # Regenerates me/about_business.pdf
+├── tools/deploy_hf_space.py     # Deploys the app to a Hugging Face Space
 ├── logs/                        # leads.jsonl, feedback.jsonl, reflections.jsonl (git-ignored)
 ├── .env                         # API key (never committed)
 ├── .env.example                 # Template for .env
@@ -46,14 +48,15 @@ business_bot/
 user message
    │
    ▼
-Router (gpt-4.1-nano, JSON output; keyword heuristic as fallback)
+Router (gpt-4.1-nano, JSON output; fast path for emails; keyword heuristic as fallback)
    │  general_question │ lead_collection │ feedback
    ▼
 Agent (system prompt = PERSONA + INSTRUCTIONS + summary + PDF + route directive,
-       chat history, and only the tools of that route)
+       last 10 exchanges of chat history, and only the tools of that route)
    │  ⇄ tool calls: record_customer_interest / record_feedback  → print + logs/*.jsonl (+ optional push)
    ▼
-Reflection (bonus): checks the draft against the instructions → approve or revise
+Reflection (bonus): checks the draft against the instructions → approve, revise, or skip
+       (+ safety net: logs an unanswered question the agent forgot to log)
    │
    ▼
 reply + Agent trace panel (route, tool calls, draft vs. final)
@@ -68,6 +71,13 @@ reply + Agent trace panel (route, tool calls, draft vs. final)
   `LLM_FALLBACK_MODELS`.
 * **Guardrails.** At most 5 tool steps per turn. The feedback route must call `record_feedback`, so feedback is never
   "promised" without being logged. Emails are validated before a lead is saved. The router has a 6-second timeout.
+* **Answer quality.** When a customer says "trimmed" or "untrimmed" without saying which product, Toumi gives both
+  options and prices (fresh $4.00 vs. frozen $3.00) instead of guessing. Reflection double-checks this, and also logs
+  any unanswered question the agent forgot to log.
+* **Speed.** Messages containing an email skip the router call. Only the last 10 exchanges are sent to the model.
+  Reflection is skipped when a tool already ran and the reply has no numbers to verify. A typical reply takes 2–3 s.
+* **Budget guard.** Each chat is capped at `MAX_MESSAGES_PER_SESSION` messages and the whole app at
+  `MAX_TURNS_PER_DAY` replies, so a public deployment cannot drain the API budget.
 
 ## Setup and run
 
@@ -78,7 +88,8 @@ pip install -r requirements.txt
 copy .env.example .env          # then put your OpenAI key in .env
 ```
 
-* **Notebook:** open `business_agent.ipynb` and choose *Run All*. The last cell launches the UI.
+* **Notebook:** open `business_agent.ipynb` and choose *Run All* (about 1 minute and $0.10 of API usage, including
+  the test set). The last cell launches the UI.
 * **App:** `python app.py`, then open http://127.0.0.1:7860
 
 ### `.env` settings
@@ -93,6 +104,8 @@ copy .env.example .env          # then put your OpenAI key in .env
 | `LLM_REFLECTION_MODEL` | `gpt-4.1-mini` | Reflection pass (Gemini default: `gemini-2.5-flash`) |
 | `LLM_FALLBACK_MODELS` | `gpt-4o-mini,gpt-4.1-nano` | Tried in order when a model is unavailable |
 | `SHOW_ADMIN_PANEL` | `false` | `true` shows the *Team inbox* tab (leads & feedback). **Keep false when public.** |
+| `MAX_MESSAGES_PER_SESSION` | `30` | Messages allowed per chat before Toumi points to WhatsApp |
+| `MAX_TURNS_PER_DAY` | `300` | Replies allowed per day for the whole app (about $1/day at most) |
 | `PUSHOVER_USER`, `PUSHOVER_TOKEN` | unset | Optional phone push notifications for new leads and feedback |
 
 > **Gemini free tier.** A free Gemini key allows only about **20 requests per model per day**, and each chat turn uses
@@ -132,22 +145,17 @@ Garliclo's logo and price-list card, and answers from the owner's family.
 
 ## Deploy to Hugging Face Spaces
 
-1. Create a new Space at https://huggingface.co/new-space with the **Gradio** SDK.
-2. Upload `app.py`, `requirements.txt`, `me/`, and `assets/`. **Do not upload `.env`.**
-3. Under *Settings → Variables and secrets*, add the secret `OPENAI_API_KEY`, and optionally the variable
-   `SHOW_ADMIN_PANEL=false`.
-4. The Space builds and runs `app.py` automatically.
+```bash
+hf auth login                                         # once, with a Hugging Face token that has write access
+python tools/deploy_hf_space.py <hf-username>/garliclo-toumi
+```
 
-## Demo video script (~3 min)
+The script creates the Space and uploads only `app.py`, `requirements.txt`, `me/` and `assets/` (never `.env`). It
+stores `OPENAI_API_KEY` as an encrypted Space secret, and sets `SHOW_ADMIN_PANEL=false` plus the usage limits. The
+first build takes a few minutes.
 
-1. **Files (20 s):** show `me/` (PDF + summary) and the persona/instructions blocks in the notebook.
-2. **General question:** click *"What do you sell, and how much does it cost?"*. Point at the Agent trace: router →
-   `general_question`, no tool, reflection ✅.
-3. **Lead:** click the shawarma-shop example, then type a name and email. The trace shows `lead_collection` and
-   `record_customer_interest`. Open *Team inbox* to show the new lead.
-4. **Unanswered question / feedback:** click *"Do you sell ready-made toum?"* or the late-delivery complaint. The trace
-   shows `feedback` and `record_feedback`; the inbox shows the entry.
-5. **Arabic:** click the Arabic example to show a reply in Lebanese dialect.
-6. **Reflection:** show the reflection demo cell in the notebook (an invented discount gets caught and rewritten), and
-   point at the draft-vs-revised view in the trace panel.
-7. **Console:** show the printed `[ROUTER]`, `[TOOL]`, `[PUSH]` and `[REFLECTION]` logs.
+## Demo video
+
+The assignment asks for "a video showcasing the functionality". The video walks through every item of the submission
+checklist above, in order: business files → persona and instructions → router → tools → system prompt and agent loop →
+Gradio demo → reflection → test results.
