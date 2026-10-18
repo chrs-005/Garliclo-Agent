@@ -145,4 +145,4 @@ first build takes a few minutes.
 
 ## Demo video
 
-*Link coming soon.*
+▶️ [Watch the demo on YouTube](https://youtu.be/kFykLcy0tM4)
