@@ -104,24 +104,31 @@ copy .env.example .env          # then put your OpenAI key in .env
 Garliclo is a real business. To update its information, edit `me/business_summary.txt` and the `CONTENT` section of
 `tools/make_business_pdf.py`, then run `python tools/make_business_pdf.py`.
 
-**From public sources:** the [@garliclo.lb Instagram](https://www.instagram.com/garliclo.lb/),
+**Confirmed by the business, or from public sources:** the [@garliclo.lb Instagram](https://www.instagram.com/garliclo.lb/),
 the [Factories in Lebanon listing](https://factoriesinlebanon.com/acadp_listings/garliclo-nader-garlic/),
-and Garliclo's price-list card.
-* Name "Garliclo | Nader Garlic", restaurant supply store, "Since 1980", air-peeled garlic (ثوم مقشّر عالهوا)
-* Customers: restaurants, industrial kitchens, butcheries
-* Location: Sin El Fil (Metn). Delivery: Beirut to Batroun (listing); "delivery across Lebanon" (Instagram)
-* Contact: WhatsApp/phone +961 70 546 473, phone +961 3 793 752, garliclo.lb@gmail.com, @garliclo.lb
+Garliclo's logo and price-list card, and answers from the owner's family.
+* "Garliclo | Nader Garlic", founded in 1980 by Joseph Nader (sole founder)
+* Logo tagline: مقشّر عالهوا مش بالميّ ("air-peeled, not water-peeled")
+* Prices are USD per kg. Products 1–2 are air-peeled in the Sin El Fil factory; products 3–4 arrive already peeled from China.
+* Main factory in Sin El Fil (Metn); delivery all over Lebanon, with the fee depending on location
+* Packaging in whatever quantity the customer needs; all forms of payment accepted
+* Business customers only: restaurants, industrial kitchens, butcheries, supermarkets and other food businesses.
+  No small quantities for households.
+* Contact: main business number (WhatsApp & calls) +961 70 546 473, second phone +961 3 793 752,
+  garliclo.lb@gmail.com, @garliclo.lb
 * Slogans: "No chopping. No peeling. No mess.", "We peel for you", consistent recipes plate after plate,
   "Chefs trust Garliclo", garlic quality all year long, "always ready"
-* The four products and their prices
 
-**Still assumed (to confirm with Joseph):**
-* Prices are **USD per kg**. Products 1–2 are air-peeled by Garliclo; products 3–4 are imported already peeled from China.
-* Joseph Nader's role ("Owner") and how he relates to "Since 1980"
-* Mission and vision wording; the air-peeling process steps
-* Storage and shelf life: fresh 0–4 °C, 2–3 weeks unopened; frozen −18 °C, up to 12 months
+**Assumed or researched (the owner approved making these up):**
+* Delivery fee table: Zone 1 Greater Beirut $3, Zone 2 Metn/Keserwan/Aley $5, Zone 3 Jbeil/Batroun/Chouf $7,
+  Zone 4 North/Bekaa/Saida $10, Zone 5 far areas $15; free delivery from 50 kg in Zones 1–3
+* Pack sizes: vacuum-sealed 1, 5 and 10 kg bags or custom quantities; frozen in 1 kg bags inside 10 kg cartons
+* Shelf life: fresh up to 3 weeks unopened at 0–4 °C (published studies on packed peeled garlic report 2–4 weeks
+  at 0–5 °C); frozen 12 months at −18 °C
+* Payment methods listed as cash (USD/LBP), bank transfer, card, Whish Money, OMT
+* Customer types beyond the bio: caterers, hotels, food manufacturers
+* Mission and vision wording, air-peeling process steps, the production and customer-care team descriptions
 * Not offered: toum, garlic paste, whole bulbs (customer requests for these are logged as demand signals)
-* Never stated by the bot because it is unknown: delivery fees, minimum order, payment methods, opening hours
 
 ## Deploy to Hugging Face Spaces
 

@@ -148,7 +148,10 @@ a Lebanese business (also known as Nader Garlic) that sells air-peeled garlic.
 INSTRUCTIONS = """\
 1. Answer ONLY from the BUSINESS SUMMARY and BUSINESS PROFILE below. Never invent products, prices, discounts,
    delivery fees, phone numbers, addresses, opening hours, or policies that are not written there.
-2. Quote prices exactly as listed (USD per kg). Never make up a total, discount, or delivery fee; say the team will confirm it.
+2. Quote prices (USD per kg) and delivery fees (per order, by zone) exactly as listed. You may add up a simple order
+   total from listed prices when asked (e.g. 20 kg x $4.00 + $5 delivery = $85). Never invent discounts: volume
+   discounts are quoted by the team. For an area not in the delivery table, say the team will confirm the fee.
+   Garliclo sells to businesses only; politely tell households and individuals that it does not sell small quantities.
 3. If you cannot answer a question from the business information, call the record_feedback tool with the customer's
    question, then tell the customer you have passed it to the team and offer to take their contact details.
 4. If a customer asks for a product or service Garliclo does not offer, say so honestly and log the request with
@@ -519,7 +522,8 @@ def run_agent(message: str, history: list, use_reflection: bool = True) -> tuple
 REFLECTION_PROMPT = """\
 You are the quality checker for Garliclo's customer assistant. Check the DRAFT reply against the INSTRUCTIONS and the
 BUSINESS INFO. Look for these problems:
-1. Invented information: any price, product, fee, discount, policy, contact detail, or fact not in the BUSINESS INFO.
+1. Invented information: any price, product, fee, discount, policy, contact detail, or fact not in the BUSINESS INFO
+   (simple arithmetic on listed prices and delivery fees is allowed).
 2. The customer showed buying interest, no email has been collected yet, and the draft does not ask for name and email.
 3. The draft claims something was saved/logged/passed to the team but TOOLS CALLED THIS TURN shows no such tool.
 4. Wrong language (must match the customer's message), out of character, or much longer than 5 sentences.
@@ -628,9 +632,14 @@ def price_list_html() -> str:
         <div class='pc-ar' dir='rtl'>{esc(ar)}</div><div class='pc-en'>{esc(en)}</div>
         <div class='pc-note'>{esc(note)}</div></div>"""
         for en, ar, price, note in pattern.findall(business_summary))
-    return (f"<div class='price-head'><span class='badge'>مقشر على الهواء · Air-peeled</span>"
+    zones = re.findall(r"^Zone (\d) — (.+?): (.+?) — \$(\d+)[ \t]*$", business_summary, re.M)
+    rows = "".join(f"<tr><td><b>{n}</b></td><td><b>{esc(name)}</b><div class='pc-note'>{esc(areas)}</div></td>"
+                   f"<td class='fee'>${fee}</td></tr>" for n, name, areas, fee in zones)
+    return (f"<div class='price-head'><span class='badge'>مقشّر عالهوا مش بالميّ · Air-peeled</span>"
             f"<h3>أسعار جديدة · New prices</h3></div>{cards}"
-            "<div class='muted'>Delivery fees & volume pricing are confirmed by the team. Ask Toumi for a quote!</div>")
+            f"<div class='price-head'><h3>🚚 Delivery all over Lebanon</h3></div>"
+            f"<table class='zones'>{rows}</table>"
+            "<div class='muted'>Fee per order · free delivery from 50 kg in Zones 1–3. Ask Toumi for a quote!</div>")
 
 
 def read_log(filename: str, columns: list[str]) -> list[list]:
@@ -667,7 +676,7 @@ EXAMPLES = [
     "شو الفرق بين المقمع وغير المقمع؟",
     "I run a shawarma shop in Jounieh and need about 20 kg a week. Can you supply me?",
     "Do you sell ready-made toum?",
-    "Do you deliver to Batroun? How can I reach you?",
+    "How much would 30 kg of trimmed garlic delivered to Tripoli cost?",
     "My last order arrived late and some cloves were soft.",
 ]
 
@@ -721,6 +730,12 @@ details summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--g
 .pc-price { font-size:24px; font-weight:800; color:var(--g-ink); } .pc-price small { font-size:12px; font-weight:500; opacity:.7; }
 .pc-ar { font-size:16px; margin-top:4px; color:var(--g-ink); } .pc-en { font-weight:600; color:var(--g-olive); }
 .pc-note { font-size:12.5px; color:#6b5f66; }
+.zones { width:100%; border-collapse:separate !important; border-spacing:0 6px; border:none !important; margin:0 !important; }
+.zones tr, .zones tbody { border:none !important; background:transparent !important; }
+.zones td { background:#fff !important; padding:8px 10px !important; vertical-align:top; border:none !important; }
+.zones td:first-child { border-radius:12px 0 0 12px; color:var(--g-plum); width:22px; }
+.zones td:last-child { border-radius:0 12px 12px 0; }
+.zones .fee { font-weight:800; font-size:18px; color:var(--g-ink); text-align:right; white-space:nowrap; }
 @media (max-width: 720px) {
   #hero { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
   #hero img { width: 62px; }
@@ -753,7 +768,7 @@ gr.set_static_paths(paths=[ASSETS_DIR])
 with gr.Blocks(title="Garliclo · Toumi") as demo:
     with gr.Row(equal_height=True):
         gr.HTML(f"""<div id='hero'><img src='/gradio_api/file={LOGO.as_posix()}' alt='Garliclo logo'>
-            <div><h1>GARLICLO</h1><p>Air-peeled garlic since 1980 · ثوم مقشّر عالهوا</p></div>
+            <div><h1>GARLICLO</h1><p><span dir='rtl'>مقشّر عالهوا مش بالميّ</span> · Air-peeled, not water-peeled · since 1980</p></div>
             <div class='online'><span class='dot'></span>Toumi, your garlic assistant, is online</div></div>""")
 
     with gr.Row(elem_id="main-row"):
