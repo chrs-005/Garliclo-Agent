@@ -77,8 +77,6 @@ FALLBACK_MODELS = [m.strip() for m in os.getenv("LLM_FALLBACK_MODELS", cfg["fall
 MAX_AGENT_STEPS = 5                                                   # guardrail against tool-call loops
 MAX_HISTORY_MESSAGES = 20                                             # short-term memory: last 10 exchanges
 AGENT_TEMPERATURE = 0.3                                               # low = consistent answers and tool use
-MAX_MESSAGES_PER_SESSION = int(os.getenv("MAX_MESSAGES_PER_SESSION", "30"))  # budget guard per chat
-MAX_TURNS_PER_DAY = int(os.getenv("MAX_TURNS_PER_DAY", "300"))                # budget guard for the whole app
 SHOW_ADMIN_PANEL = os.getenv("SHOW_ADMIN_PANEL", "false").lower() == "true"
 
 if not API_KEY:
@@ -554,10 +552,8 @@ def run_agent(message: str, history: list, use_reflection: bool = True) -> tuple
 # * Garliclo colours, logo, and an Arabic-friendly font (Cairo), with each message auto-aligned for Arabic (RTL) or Latin text
 # * an **Agent trace** panel showing the router's decision, every tool call, and the reflection draft vs. final reply
 # * the **price list** read live from `business_summary.txt`
-# * an optional **team inbox** (leads & feedback logs, enabled with `SHOW_ADMIN_PANEL=true` in `.env`; keep it off on a
-#   public deployment so customer data is never shown to visitors)
-# * a collapsed **Advanced settings** section (reflection on by default) and **usage limits** that protect the API
-#   budget on a public deployment (`MAX_MESSAGES_PER_SESSION`, `MAX_TURNS_PER_DAY`)
+# * an optional **team inbox** showing the leads & feedback logs (enabled with `SHOW_ADMIN_PANEL=true` in `.env`)
+# * a collapsed **Advanced settings** section (reflection on by default)
 #
 # The reflection step it calls is defined in Section 8, just below; Python resolves it when a message arrives.
 
@@ -648,30 +644,11 @@ LEAD_COLUMNS = ["time", "name", "email", "message"]
 FEEDBACK_COLUMNS = ["time", "question"]
 
 
-usage_today = {"date": datetime.date.today(), "turns": 0}
-
-
-def usage_limit_reached(history: list) -> str | None:
-    """Budget guard for public deployments: a message cap per chat session and a daily cap for the whole app."""
-    if usage_today["date"] != datetime.date.today():
-        usage_today.update(date=datetime.date.today(), turns=0)
-    if sum(1 for m in clean_history(history) if m["role"] == "user") >= MAX_MESSAGES_PER_SESSION:
-        return "We've chatted a lot! 🧄 For anything else, WhatsApp the team at +961 70 546 473."
-    if usage_today["turns"] >= MAX_TURNS_PER_DAY:
-        return "Toumi is resting for today 🧄 Please WhatsApp the team at +961 70 546 473."
-    usage_today["turns"] += 1
-    return None
-
-
 def respond(message: str, history: list, use_reflection: bool):
     """Gradio ChatInterface callback → reply + side-panel updates."""
     try:
-        limit_message = usage_limit_reached(history)
-        if limit_message:
-            reply, panel = limit_message, "<div class='trace-empty'>⏸️ Usage limit reached: no API call made.</div>"
-        else:
-            reply, trace = run_agent(message, history, use_reflection)
-            panel = render_trace(trace)
+        reply, trace = run_agent(message, history, use_reflection)
+        panel = render_trace(trace)
     except Exception as exc:
         print(f"❌ [ERROR] {exc!r}")
         reply = "Oops, Toumi lost connection for a second 🧄 Please try again."
